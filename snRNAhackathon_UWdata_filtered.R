@@ -5,7 +5,7 @@ library(rqdatatable)
 library(synapser)
 
 #to login to synapse manually: synLogin("username", "password")
-synLogin()
+#synLogin( rememberMe = TRUE)
 
 system( paste0('tar -xvf ', synapser::synGet('syn21614190')$path) )
 system( 'gunzip home/dnanexus/6672/outs/filtered_feature_bc_matrix/matrix.mtx.gz' )
@@ -122,7 +122,9 @@ metadata$ids <- as.factor(metadata$ids)
 head(metadata)
 
 #this count threshold can be changed
-counts <- dat[rowSums(dat != 0) >= 250,]
+counts <- dat[rowSums(dat != 0) >= 2,]
+
+#countKeep <- rowSums(counts !=0) >=250
 dim(counts)
 
 #Make the cell_data_set (CDS) object for monocle:
@@ -210,6 +212,21 @@ p6<-plot_cells(cds_uw, color_cells_by="cluster",cell_size=.1,label_cell_groups=0
 grid.arrange(arrangeGrob(p1,p6, ncol=2),arrangeGrob(p3,p2,ncol=2),p4, heights=c(2,2,4), ncol=1)
 #dev.off()
 
+table(cds_uw@clusters@listData$UMAP$partitions)
+
+cds_test <- cds_uw[,cds_uw@clusters$UMAP$partitions==10]
+dim(cds_test)
+#cds_test <- cds_test[rowSums(as.matrix(cds_test) != 0) >= 2,]
+cds_test <- cds_test[1:10,]
+
+###differential expresion analysis of individual cluster population
+eprs_model <- monocle3::fit_models(cds_test,
+                                   "~ePRS")
+
+#foobar <- sapply(eprs_model$model_summary,function(x) x$coef[2,4])
+res11<-monocle3::coefficient_table(eprs_model)
+
+
 #label marker genes, defined by mathys et al
 genes<-c()
 for (gene in unique(c(as.vector(mathy_marker_genes$gene.name),c("SYT1","SNAP25","GRIN1","GAD1","GAD2","SLC17A7","CAMK2A","NRGN","AQP4",
@@ -243,6 +260,16 @@ p6<-plot_cells(cds_subset, color_cells_by="cluster",cell_size=.1,label_cell_grou
 grid.arrange(arrangeGrob(p1,p6, ncol=2),arrangeGrob(p3,p2,ncol=2),p4, heights=c(2,2,4), ncol=1)
 #dev.off()
 
+gene_module_df <- find_gene_modules(cds_subset, resolution=1e-2)
+
+View(gene_module_df)
+
+table(gene_module_df$supermodule)
+
+mod17<-dplyr::filter(gene_module_df,module==17)
+write.csv(mod17,file='mod17.csv',quote=F,row.names=F)
+
+cat(mod17$id,file='mod17.txt',sep='\n')
 #saveRDS(cds_subset, file = "UW_monocle_preprocessed_cds.rds")
 #cds_uw <- readRDS(file = "UW_monocle_preprocessed_cds.rds")
 
